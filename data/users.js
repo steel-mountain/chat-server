@@ -1,21 +1,38 @@
-export let users = [];
-
-export const getTrimStr = (str) => str.trim().toLowerCase();
+export let users = {};
 
 export const addUser = ({ name, room, id }) => {
   if (name === "" && room === "") {
     console.log("error in add user!");
   }
 
-  const userName = getTrimStr(name);
-  const userRoom = getTrimStr(room);
+  const isUnique = checkUser({ name, room });
 
-  users.push({ name: userName, room: userRoom, id });
+  if (users[room] && isUnique) {
+    users[room].push({ name, id, room });
+  } else {
+    users[room] = [{ name, id, room }];
+  }
+
+  console.log(users);
+};
+
+export const checkUser = ({ name, room }) => {
+  let isUnique = true;
+
+  if (users[room]) {
+    users[room].forEach((item) => {
+      if (item.name === name) {
+        isUnique = false;
+      }
+    });
+  }
+  return isUnique;
 };
 
 export const removeUser = (data) => {
-  const { name, room } = data;
-  users = users.filter((user) => user.name !== name && user.room !== room);
+  const { room, name } = data;
+  if (users[room]) {
+    users[room] = users[room]?.filter((user) => user.name !== name);
+    users[room].length === 0 && delete users[room];
+  }
 };
-
-// приложение крашится при закрытие окна в браузере

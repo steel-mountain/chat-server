@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 import { createServer } from "http";
-import { addUser, users, removeUser, getTrimStr } from "./data/users.js";
+import { addUser, users, removeUser, checkUser } from "./data/users.js";
 
 const PORT = 5000;
 const app = express();
@@ -18,17 +18,7 @@ io.on("connection", (socket) => {
 
   socket.on("checkName", (data, callback) => {
     const { name, room } = data;
-    let isUnique = true;
-
-    users.forEach((item) => {
-      if (
-        getTrimStr(item.room) === getTrimStr(room) &&
-        getTrimStr(item.name) === getTrimStr(name)
-      ) {
-        isUnique = false;
-      }
-    });
-    console.log(users);
+    const isUnique = checkUser({ name, room });
     callback(isUnique);
   });
 
@@ -38,18 +28,43 @@ io.on("connection", (socket) => {
     socket.join(room);
 
     socket.emit("message", { name: "Admin", message: `Hello ${name}` });
+    io.to(room).emit("users", users[room]);
 
-    socket.broadcast
-      .to(room)
-      .emit("message", { name: "Admin", message: `${name} has join to us` });
+    socket.broadcast.to(room).emit("message", {
+      name: "Admin",
+      message: `${name} has join to us`,
+    });
+  });
+
+  socket.on("sendMessage", ({ message, params }) => {
+    const { name, room } = params;
+    io.to(room).emit("message", {
+      name,
+      message,
+    });
+  });
+
+  socket.on("logout", (data) => {
+    const { name, room } = data;
+    removeUser(data);
+
+    io.to(room).emit("message", {
+      name: "Admin",
+      message: `${name} has left`,
+    });
+    io.to(room).emit("users", users[room]);
+    console.log(users);
   });
 
   socket.on("disconnect", () => {
     console.log("user disconnected");
-    const user = users.find((user) => user.id === socket.id);
-    if (user) {
-      removeUser(user);
-    }
+
+    const user = Object.values(users)
+      .flat()
+      .find((user) => user.id === socket.id);
+
+    user && removeUser(user);
+
     console.log(users);
   });
 });
