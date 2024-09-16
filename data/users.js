@@ -12,8 +12,6 @@ export const addUser = ({ name, room, id }) => {
   } else {
     users[room] = [{ name, id, room }];
   }
-
-  console.log(users);
 };
 
 export const checkUser = ({ name, room }) => {

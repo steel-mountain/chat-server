@@ -3,6 +3,10 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import { addUser, users, removeUser, checkUser } from "./data/users.js";
+import fs from "fs";
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PORT = 5000;
 const app = express();
@@ -28,6 +32,7 @@ io.on("connection", (socket) => {
     socket.join(room);
 
     socket.emit("message", { name: "Admin", message: `Hello ${name}` });
+    console.log(users[room]);
     io.to(room).emit("users", users[room]);
 
     socket.broadcast.to(room).emit("message", {
@@ -36,12 +41,36 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("sendMessage", ({ message, params }) => {
+  socket.on("sendMessage", (data) => {
+    const { fileName, dataBuffer, message, params } = data;
     const { name, room } = params;
-    io.to(room).emit("message", {
-      name,
-      message,
-    });
+
+    if (fileName && dataBuffer) {
+      const buffer = Buffer.from(dataBuffer);
+      const filePath = path.join(__dirname, "uploads", fileName);
+
+      fs.writeFile(filePath, buffer, (err) => {
+        if (err) {
+          console.error("Ошибка при сохранении файла:", err);
+          return;
+        }
+
+        console.log("Файл успешно сохранен:", filePath);
+
+        const object = {
+          name,
+          message,
+          url: `/uploads/${fileName}`,
+        };
+
+        io.to(room).emit("message", object);
+      });
+    } else {
+      io.to(room).emit("message", {
+        name,
+        message,
+      });
+    }
   });
 
   socket.on("logout", (data) => {
@@ -53,7 +82,6 @@ io.on("connection", (socket) => {
       message: `${name} has left`,
     });
     io.to(room).emit("users", users[room]);
-    console.log(users);
   });
 
   socket.on("disconnect", () => {
@@ -68,6 +96,8 @@ io.on("connection", (socket) => {
     console.log(users);
   });
 });
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/", (req, res) => {
   res.send("Hello world");
