@@ -93,6 +93,16 @@ io.on("connection", (socket) => {
 
     user && removeUser(user);
 
+    if (user) {
+      const { name, room } = user;
+
+      io.to(room).emit("message", {
+        name: "Admin",
+        message: `${name} has left`,
+      });
+      io.to(room).emit("users", users[room]);
+    }
+
     console.log(users);
   });
 });
