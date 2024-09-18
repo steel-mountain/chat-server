@@ -3,12 +3,13 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import { addUser, users, removeUser, checkUser } from "./data/users.js";
-import fs from "fs";
+import fs from "fs/promises";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const PORT = 5000;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PORT = process.env.PORT || 5000;
+
 const app = express();
 app.use(cors());
 
@@ -28,11 +29,9 @@ io.on("connection", (socket) => {
 
   socket.on("join", ({ name, room }) => {
     addUser({ name, room, id: socket.id });
-
     socket.join(room);
 
     socket.emit("message", { name: "Admin", message: `Hello ${name}` });
-    console.log(users[room]);
     io.to(room).emit("users", users[room]);
 
     socket.broadcast.to(room).emit("message", {
@@ -41,19 +40,24 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("sendMessage", (data) => {
-    const { fileName, dataBuffer, message, params } = data;
-    const { name, room } = params;
+  socket.on("typing", ({ name, room, status }) => {
+    socket.broadcast.to(room).emit("typing", {
+      name,
+      room,
+      status,
+    });
+  });
 
-    if (fileName && dataBuffer) {
-      const buffer = Buffer.from(dataBuffer);
-      const filePath = path.join(__dirname, "uploads", fileName);
+  socket.on("sendMessage", async (data) => {
+    try {
+      const { fileName, dataBuffer, message, params } = data;
+      const { name, room } = params;
 
-      fs.writeFile(filePath, buffer, (err) => {
-        if (err) {
-          console.error("Ошибка при сохранении файла:", err);
-          return;
-        }
+      if (fileName && dataBuffer) {
+        const buffer = Buffer.from(dataBuffer);
+        const filePath = path.join(__dirname, "uploads", fileName);
+
+        await fs.writeFile(filePath, buffer);
 
         console.log("Файл успешно сохранен:", filePath);
 
@@ -64,12 +68,14 @@ io.on("connection", (socket) => {
         };
 
         io.to(room).emit("message", object);
-      });
-    } else {
-      io.to(room).emit("message", {
-        name,
-        message,
-      });
+      } else {
+        io.to(room).emit("message", {
+          name,
+          message,
+        });
+      }
+    } catch (error) {
+      console.log(`Error is: ${error}`);
     }
   });
 
@@ -91,10 +97,9 @@ io.on("connection", (socket) => {
       .flat()
       .find((user) => user.id === socket.id);
 
-    user && removeUser(user);
-
     if (user) {
       const { name, room } = user;
+      removeUser(user);
 
       io.to(room).emit("message", {
         name: "Admin",
@@ -117,5 +122,5 @@ server.listen(PORT, (err) => {
   if (err) {
     console.error(`error is: ${err}`);
   }
-  console.log("Server is running on port 5000");
+  console.log(`Server is running on port: ${PORT}`);
 });
