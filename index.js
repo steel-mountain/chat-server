@@ -1,11 +1,12 @@
-import express from "express";
 import cors from "cors";
-import { Server } from "socket.io";
-import { createServer } from "http";
-import { addUser, users, removeUser, checkUser } from "./data/users.js";
+import express from "express";
 import fs from "fs/promises";
+import { createServer } from "http";
 import path, { dirname } from "path";
+import { Server } from "socket.io";
 import { fileURLToPath } from "url";
+import { checkName, joinUser, removeUser } from "./controllers/user.js";
+import { users } from "./data/users.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5000;
@@ -15,30 +16,12 @@ app.use(cors());
 
 const server = createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: { origin: "*" },
 });
 
 io.on("connection", (socket) => {
-  console.log("start socket");
-
-  socket.on("checkName", (data, callback) => {
-    const { name, room } = data;
-    const isUnique = checkUser({ name, room });
-    callback(isUnique);
-  });
-
-  socket.on("join", ({ name, room }) => {
-    addUser({ name, room, id: socket.id });
-    socket.join(room);
-
-    socket.emit("message", { name: "Admin", message: `Hello ${name}` });
-    io.to(room).emit("users", users[room]);
-
-    socket.broadcast.to(room).emit("message", {
-      name: "Admin",
-      message: `${name} has join to us`,
-    });
-  });
+  socket.on("checkName", (data, cb) => checkName(data, cb));
+  socket.on("join", (user) => joinUser(user, socket, io));
 
   socket.on("typing", ({ name, room, status }) => {
     socket.broadcast.to(room).emit("typing", {
