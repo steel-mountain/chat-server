@@ -54,3 +54,33 @@ export const removeUser = (data) => {
     users[room].length === 0 && delete users[room];
   }
 };
+
+export const logout = (data, io) => {
+  const { name, room } = data;
+  removeUser(data);
+
+  io.to(room).emit("message", {
+    name: "Admin",
+    message: `${name} has left`,
+  });
+  io.to(room).emit("users", users[room]);
+};
+
+export const disconnect = (socket, io) => {
+  console.log("user disconnected");
+
+  const user = Object.values(users)
+    .flat()
+    .find((user) => user.id === socket.id);
+
+  if (user) {
+    const { name, room } = user;
+    removeUser(user);
+
+    io.to(room).emit("message", {
+      name: "Admin",
+      message: `${name} has left`,
+    });
+    io.to(room).emit("users", users[room]);
+  }
+};

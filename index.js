@@ -5,8 +5,7 @@ import { createServer } from "http";
 import path, { dirname } from "path";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
-import { checkName, joinUser, removeUser } from "./controllers/user.js";
-import { users } from "./data/users.js";
+import { checkName, disconnect, joinUser, logout } from "./controllers/user.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5000;
@@ -62,37 +61,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("logout", (data) => {
-    const { name, room } = data;
-    removeUser(data);
-
-    io.to(room).emit("message", {
-      name: "Admin",
-      message: `${name} has left`,
-    });
-    io.to(room).emit("users", users[room]);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("user disconnected");
-
-    const user = Object.values(users)
-      .flat()
-      .find((user) => user.id === socket.id);
-
-    if (user) {
-      const { name, room } = user;
-      removeUser(user);
-
-      io.to(room).emit("message", {
-        name: "Admin",
-        message: `${name} has left`,
-      });
-      io.to(room).emit("users", users[room]);
-    }
-
-    console.log(users);
-  });
+  socket.on("logout", (data) => logout(data, io));
+  socket.on("disconnect", () => disconnect(socket, io));
 });
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
