@@ -74,13 +74,6 @@ export const disconnect = (socket, io) => {
     .find((user) => user.id === socket.id);
 
   if (user) {
-    const { name, room } = user;
-    removeUser(user);
-
-    io.to(room).emit("message", {
-      name: "Admin",
-      message: `${name} has left`,
-    });
-    io.to(room).emit("users", users[room]);
+    logout(user, io);
   }
 };
