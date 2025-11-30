@@ -1,4 +1,9 @@
+import fs from "fs/promises";
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
 import { users } from "../data/users.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const addUser = ({ name, room, id }) => {
   if (name === "" && room === "") {
@@ -64,16 +69,51 @@ export const logout = (data, io) => {
     message: `${name} has left`,
   });
   io.to(room).emit("users", users[room]);
+  console.log(`user ${name} has disconnected`);
 };
 
 export const disconnect = (socket, io) => {
-  console.log("user disconnected");
-
   const user = Object.values(users)
     .flat()
     .find((user) => user.id === socket.id);
 
   if (user) {
     logout(user, io);
+  }
+};
+
+export const typing = (name, room, status, socket) => {
+  socket.broadcast.to(room).emit("typing", {
+    name,
+    room,
+    status,
+  });
+};
+
+export const sendMessage = async (data, io) => {
+  try {
+    const { fileName, dataBuffer, message, params } = data;
+    const { name, room } = params;
+
+    if (fileName && dataBuffer) {
+      const buffer = Buffer.from(dataBuffer);
+      const filePath = path.join(__dirname, "..", "uploads", fileName);
+
+      await fs.writeFile(filePath, buffer);
+
+      console.log("Файл успешно сохранен:", filePath);
+
+      const object = {
+        name,
+        message,
+        url: `/uploads/${fileName}`,
+      };
+
+      io.to(room).emit("message", object);
+    } else {
+      io.to(room).emit("message", { name, message });
+    }
+  } catch (error) {
+    console.log(`Error is: ${error}`);
   }
 };
